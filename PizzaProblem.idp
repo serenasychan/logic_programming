@@ -1,0 +1,94 @@
+//Given a set of pizzas with prices and a set of voucher of the form “buy x pizzas, get y free”, determine the optimal cost of the pizzas. 
+//Serena Chan, 2016
+//with help from CMPT 417 David Mitchell
+vocabulary V {
+    type vindex isa int		// voucher identifier
+    type pindex isa int		// pizza identifier
+    type num isa int
+
+    //constants
+    n : pindex				// total number of pizzas
+    m : vindex				// total number of vouchers
+    cost : num				// cost of buying pizzas
+    
+    //functions
+    price(pindex): num		// price of pizza
+    buy(vindex)  : num		// number of pizzas to buy to use voucher
+    free(vindex) : num		// number of pizzas you get if use voucher
+
+    //predicates
+    V(vindex)				// if true, voucher used
+    Justify(vindex,pindex)	// pizza paid for to use voucher 
+    Apply(vindex,pindex)  	// pizza you got for free when using voucher
+}
+
+structure S : V {
+    num = {1..50}
+    n = 4
+    pindex = {1..4}
+    m = 2
+    vindex = {1..2}
+    price = {
+        1-> 10;
+        2-> 5;
+        3-> 20;
+        4-> 15
+    }
+    buy = {
+        1-> 1;
+        2-> 2
+        
+    }
+    free = {
+        1-> 1;
+        2-> 1
+    }
+}
+
+theory T : V{  
+    // if a voucher is applied, you must have gotten at least one pizza for free
+	// ! Assuming you won't use a voucher if it doesn't give you a free pizza
+    ! v : V(v) <=> ? p : Apply(v,p).
+    
+    // if a voucher is applied, you must have bought at least one pizza
+    // ! Assuming vouchers don't give a pizza for free without purchase
+    ! v : V(v) <=> ? p : Justify(v,p).    
+    
+    // if a voucher is applied, you must meet the min. # pizzas bought
+    ! v : V(v) => #{p[pindex] : Justify(v,p)} >= buy(v).
+
+    // if a voucher is applied, you don't get more free pizzas than allowed
+    ! v : V(v) => #{p[pindex] : Apply(v,p)} =< free(v).
+
+    // you must pay for the more expensive pizza
+    ! v[vindex] p1[pindex] p2[pindex] : Justify(v,p1) & Apply(v,p2) => price(p2) =< price(p1).
+
+    // calculate total cost as sum of price of non-free pizzas 
+    cost = sum{ p[pindex] : ~?v[vindex] : Apply(v,p) : price(p)}.
+ 
+    // each pizza can only be used to justify at most 1 voucher
+    ! p : ?=<1 v : Justify(v,p).
+
+    // if you didn't use a voucher, no pizzas are bought to justify that voucher
+    ! v : ~V(v) <=> ! p : ~Justify(v,p).  
+    
+    // if a pizza is used to justify a voucher, then it wasn't gotten for free
+    ! p v : Justify(v,p) => ~? v2 : Apply(v2,p).
+    // if a pizza is free by applying a voucher, then you didn't pay for it
+    ! p v : Apply(v,p) => ~? v2 : Justify(v2,p).
+}
+
+term t: V {
+	cost
+}
+
+vocabulary Vout {
+    extern V::cost/0:1
+    extern V::Apply/2
+    extern V::Justify/2
+}
+
+procedure main(){
+    // only return 1 model with the best cost
+    printmodels(minimize(T,S,t,Vout))
+}
